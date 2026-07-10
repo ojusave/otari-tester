@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Otari Tester</title>
+    <link rel="icon" href="https://render.com/favicon.ico" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=IBM+Plex+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="page">
+      <header class="top">
+        <a class="brand" href="/">Otari Tester</a>
+        <nav class="top-actions">
+          <a
+            id="deploy-btn"
+            class="btn btn-deploy"
+            href="https://render.com/deploy"
+            target="_blank"
+            rel="noopener"
+          >
+            <img
+              src="https://render.com/images/deploy-to-render-button.svg"
+              alt="Deploy to Render"
+              height="32"
+            />
+          </a>
+          <a
+            id="signup-btn"
+            class="btn btn-signup"
+            href="#"
+            target="_blank"
+            rel="noopener"
+            >Sign up on Render</a
+          >
+        </nav>
+      </header>
+
+      <main>
+        <section class="hero">
+          <h1>Smoke-test a live Otari</h1>
+          <p>
+            Hits health, readiness, then a chat completion against your gateway.
+            Defaults to the Render deploy under test.
+          </p>
+        </section>
+
+        <form id="smoke-form" class="panel">
+          <label>
+            Otari URL
+            <input
+              id="base-url"
+              name="baseUrl"
+              type="url"
+              required
+              autocomplete="off"
+              spellcheck="false"
+            />
+          </label>
+          <label>
+            API key <span class="hint">gw-… from Otari logs</span>
+            <input
+              id="api-key"
+              name="apiKey"
+              type="password"
+              autocomplete="off"
+              placeholder="gw-…"
+              required
+            />
+          </label>
+          <div class="row">
+            <label>
+              Model
+              <input
+                id="model"
+                name="model"
+                type="text"
+                value="openai:gpt-4o-mini"
+                spellcheck="false"
+              />
+            </label>
+            <label>
+              Prompt
+              <input id="prompt" name="prompt" type="text" value="ping" />
+            </label>
+          </div>
+          <button type="submit" id="run-btn">Run smoke tests</button>
+        </form>
+
+        <section id="results" class="results" hidden>
+          <div class="results-head">
+            <h2>Results</h2>
+            <p id="summary" class="summary"></p>
+          </div>
+          <ol id="checks" class="checks"></ol>
+        </section>
+      </main>
+
+      <footer>
+        <a id="github-link" href="https://github.com/ojusave/otari-tester"
+          >GitHub</a
+        >
+        <span class="sep">·</span>
+        <a
+          href="https://render.com/docs"
+          target="_blank"
+          rel="noopener"
+          >Render docs</a
+        >
+      </footer>
+    </div>
+    <script type="module" src="/app.js"></script>
+  </body>
+</html>

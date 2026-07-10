@@ -1,0 +1,20 @@
+# yaml-language-server: $schema=https://render.com/schema/render.yaml.json
+
+services:
+  - type: web
+    name: otari-tester
+    runtime: node
+    plan: starter
+    region: oregon
+    buildCommand: npm ci && npm run build
+    startCommand: npm start
+    healthCheckPath: /healthz
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: OTARI_BASE_URL
+        value: https://otari-ngc0.onrender.com
+      - key: GITHUB_REPO
+        value: https://github.com/ojusave/otari-tester
+      - key: OTARI_API_KEY
+        sync: false
