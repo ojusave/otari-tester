@@ -2,6 +2,8 @@ const form = document.getElementById("chat-form");
 const sendBtn = document.getElementById("send-btn");
 const modelSelect = document.getElementById("model");
 const modelStatus = document.getElementById("model-status");
+const customWrap = document.getElementById("custom-model-wrap");
+const customModel = document.getElementById("custom-model");
 const baseUrlInput = document.getElementById("base-url");
 const apiKeyInput = document.getElementById("api-key");
 const promptInput = document.getElementById("prompt");
@@ -18,15 +20,18 @@ const pillReadiness = document.getElementById("pill-readiness");
 const healthValue = document.getElementById("health-value");
 const readinessValue = document.getElementById("readiness-value");
 
+const CUSTOM_VALUE = "__custom__";
+
 let fallbackModels = [];
-let fallbackDefault = "openai:gpt-4o-mini";
+let fallbackDefault = "openai:gpt-4.1-mini";
 let refreshTimer = null;
 let pollTimer = null;
 let lastFetchKey = "";
 let hasEnvApiKey = false;
+let modelSource = "suggested";
 
 function fillModels(groups, preferredId) {
-  const previous = modelSelect.value;
+  const previous = selectedModelId();
   modelSelect.innerHTML = "";
   for (const group of groups) {
     const optgroup = document.createElement("optgroup");
@@ -34,19 +39,40 @@ function fillModels(groups, preferredId) {
     for (const m of group.models) {
       const opt = document.createElement("option");
       opt.value = m.id;
-      opt.textContent = `${group.group}: ${m.label}`;
+      opt.textContent = m.label.includes(":") ? m.label : `${group.group}: ${m.label}`;
       optgroup.appendChild(opt);
     }
     modelSelect.appendChild(optgroup);
   }
+  const custom = document.createElement("option");
+  custom.value = CUSTOM_VALUE;
+  custom.textContent = "Custom model id…";
+  modelSelect.appendChild(custom);
+
   const ids = [...modelSelect.options].map((o) => o.value);
-  if (previous && ids.includes(previous)) {
+  if (previous && previous !== CUSTOM_VALUE && ids.includes(previous)) {
     modelSelect.value = previous;
+  } else if (previous === CUSTOM_VALUE) {
+    modelSelect.value = CUSTOM_VALUE;
   } else if (preferredId && ids.includes(preferredId)) {
     modelSelect.value = preferredId;
   } else if (ids[0]) {
     modelSelect.value = ids[0];
   }
+  syncCustomVisibility();
+}
+
+function selectedModelId() {
+  if (modelSelect.value === CUSTOM_VALUE) {
+    return customModel.value.trim();
+  }
+  return modelSelect.value;
+}
+
+function syncCustomVisibility() {
+  const show = modelSelect.value === CUSTOM_VALUE;
+  customWrap.hidden = !show;
+  customModel.required = show;
 }
 
 function setModelStatus(text) {
@@ -123,12 +149,15 @@ async function refreshModels({ force = false } = {}) {
   lastFetchKey = fetchKey;
 
   if (!apiKey && !hasEnvApiKey) {
+    modelSource = "suggested";
     fillModels(fallbackModels, fallbackDefault);
-    setModelStatus("curated defaults — paste a gw-… key for live models");
+    setModelStatus(
+      "Suggested models — paste a gw-… key to load this Otari’s live catalog"
+    );
     return;
   }
 
-  setModelStatus("loading live models…");
+  setModelStatus("Refreshing models from Otari…");
   try {
     const res = await fetch("/api/models", {
       method: "POST",
@@ -137,20 +166,23 @@ async function refreshModels({ force = false } = {}) {
     });
     const json = await res.json();
     if (!res.ok || !json.data) {
+      modelSource = "suggested";
       fillModels(fallbackModels, fallbackDefault);
       setModelStatus(json.error?.message ?? "could not load models");
       return;
     }
 
+    modelSource = json.data.source;
     fillModels(json.data.models, json.data.defaultModel);
     if (json.data.source === "live") {
       setModelStatus(
-        `live from Otari · ${json.data.count} models · ${json.data.ms}ms`
+        `${json.data.message} · updated ${new Date().toLocaleTimeString()}`
       );
     } else {
-      setModelStatus(json.data.message ?? "curated defaults");
+      setModelStatus(json.data.message ?? "Suggested models");
     }
   } catch (err) {
+    modelSource = "suggested";
     fillModels(fallbackModels, fallbackDefault);
     setModelStatus(err instanceof Error ? err.message : "models request failed");
   }
@@ -168,7 +200,7 @@ function startPolling() {
   pollTimer = setInterval(() => {
     if (!apiKeyInput.value.trim() && !hasEnvApiKey) return;
     refreshModels({ force: true }).catch(console.error);
-  }, 30_000);
+  }, 20_000);
 }
 
 async function loadConfig() {
@@ -180,7 +212,6 @@ async function loadConfig() {
   document.getElementById("signup-btn").href = cfg.signupNavbar;
   document.getElementById("github-link").href = cfg.githubRepo;
   document.getElementById("otari-template-btn").href = cfg.otariTemplateDeployUrl;
-  document.getElementById("otari-template-link").href = cfg.otariTemplateDeployUrl;
   document.getElementById("otari-template-repo").href = cfg.otariTemplateRepo;
 
   fallbackModels = cfg.models;
@@ -190,7 +221,7 @@ async function loadConfig() {
 
   if (hasEnvApiKey) {
     apiKeyInput.required = false;
-    apiKeyInput.placeholder = "using OTARI_API_KEY from env — or paste to override";
+    apiKeyInput.placeholder = "using env key — or paste to override";
   }
 
   await refreshModels({ force: true });
@@ -201,9 +232,19 @@ baseUrlInput.addEventListener("change", scheduleRefresh);
 baseUrlInput.addEventListener("blur", scheduleRefresh);
 apiKeyInput.addEventListener("input", scheduleRefresh);
 apiKeyInput.addEventListener("change", scheduleRefresh);
+modelSelect.addEventListener("change", syncCustomVisibility);
 
 form.addEventListener("submit", async (event) => {
   event.preventDefault();
+  const model = selectedModelId();
+  if (!model) {
+    showReply({
+      chat: { ok: false, error: "Pick or enter a model id.", ms: 0 },
+      model: "",
+    });
+    return;
+  }
+
   sendBtn.disabled = true;
   sendBtn.textContent = "Sending…";
 
@@ -215,7 +256,7 @@ form.addEventListener("submit", async (event) => {
       body: JSON.stringify({
         baseUrl: baseUrlInput.value.trim(),
         apiKey: apiKeyInput.value.trim(),
-        model: modelSelect.value,
+        model: selectedModelId(),
         prompt: promptInput.value.trim(),
       }),
     });
@@ -227,15 +268,15 @@ form.addEventListener("submit", async (event) => {
           error: json.error?.message ?? "Request failed",
           ms: 0,
         },
-        model: modelSelect.value,
+        model: selectedModelId(),
       });
       setPill(pillHealth, healthValue, null);
       setPill(pillReadiness, readinessValue, null);
       return;
     }
 
-    const { health, readiness, chat, model } = json.data;
-    showReply({ chat, model });
+    const { health, readiness, chat, model: usedModel } = json.data;
+    showReply({ chat, model: usedModel });
     setPill(pillHealth, healthValue, health);
     setPill(pillReadiness, readinessValue, readiness);
   } catch (err) {
@@ -245,7 +286,7 @@ form.addEventListener("submit", async (event) => {
         error: err instanceof Error ? err.message : String(err),
         ms: 0,
       },
-      model: modelSelect.value,
+      model: selectedModelId(),
     });
   } finally {
     sendBtn.disabled = false;

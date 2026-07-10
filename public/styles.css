@@ -166,6 +166,10 @@ label {
   font-weight: 500;
 }
 
+.custom-model[hidden] {
+  display: none !important;
+}
+
 input,
 select,
 textarea {

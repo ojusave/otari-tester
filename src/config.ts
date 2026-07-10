@@ -7,6 +7,8 @@ export const config = {
     process.env.OTARI_BASE_URL ?? "https://otari-ngc0.onrender.com",
   /** Optional default gateway key (gw-…). Prefer pasting in the UI. */
   otariApiKey: process.env.OTARI_API_KEY ?? "",
+  /** Optional master key for listing models without a pasted gw- key. */
+  otariMasterKey: process.env.OTARI_MASTER_KEY ?? "",
   githubRepo:
     process.env.GITHUB_REPO ?? "https://github.com/ojusave/otari-tester",
   /** One-click Otari gateway template (gallery). */

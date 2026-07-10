@@ -56,14 +56,7 @@
           <h1>Talk to your Otari gateway</h1>
           <p>
             Paste a gateway URL and a <code>gw-…</code> key from Otari’s logs,
-            write a prompt, and read the reply. Need a gateway?
-            <a
-              id="otari-template-link"
-              href="https://render.com/deploy-template/api/github/start?template_repo=otari-render-template"
-              target="_blank"
-              rel="noopener"
-              >Deploy Otari on Render</a
-            >.
+            pick a model, and send a prompt.
           </p>
         </section>
 
@@ -81,7 +74,7 @@
               />
             </label>
             <label>
-              API key <span class="hint">gw-…</span>
+              API key <span class="hint">gw-… from Otari logs</span>
               <input
                 id="api-key"
                 name="apiKey"
@@ -95,8 +88,19 @@
 
           <label>
             Model
-            <span class="hint" id="model-status">curated defaults</span>
+            <span class="hint" id="model-status">loading…</span>
             <select id="model" name="model" required></select>
+          </label>
+
+          <label class="custom-model" id="custom-model-wrap" hidden>
+            Custom model id
+            <input
+              id="custom-model"
+              name="customModel"
+              type="text"
+              placeholder="provider:model-name"
+              spellcheck="false"
+            />
           </label>
 
           <label>

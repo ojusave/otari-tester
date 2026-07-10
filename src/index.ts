@@ -22,7 +22,7 @@ app.get("/api/config", (_req, res) => {
   res.json({
     data: {
       otariBaseUrl: config.otariBaseUrl,
-      hasEnvApiKey: Boolean(config.otariApiKey),
+      hasEnvApiKey: Boolean(config.otariApiKey || config.otariMasterKey),
       githubRepo: config.githubRepo,
       /** Deploy this tester app. */
       deployUrl: `https://render.com/deploy?repo=${encodeURIComponent(config.githubRepo)}`,
@@ -41,24 +41,27 @@ app.get("/healthz", (_req, res) => {
   res.status(200).json({ status: "ok" });
 });
 
+function resolveApiKey(bodyKey: unknown): string {
+  if (typeof bodyKey === "string" && bodyKey.trim()) return bodyKey.trim();
+  return config.otariApiKey || config.otariMasterKey;
+}
+
 /** Live models from Otari `/v1/models`. Falls back to curated list on failure. */
 app.post("/api/models", async (req, res) => {
   const baseUrl =
     typeof req.body?.baseUrl === "string" && req.body.baseUrl.trim()
       ? req.body.baseUrl.trim()
       : config.otariBaseUrl;
-  const apiKey =
-    typeof req.body?.apiKey === "string" && req.body.apiKey.trim()
-      ? req.body.apiKey.trim()
-      : config.otariApiKey;
+  const apiKey = resolveApiKey(req.body?.apiKey);
 
   if (!apiKey) {
     res.json({
       data: {
-        source: "fallback",
+        source: "suggested",
         models: fallbackModelGroups(),
         defaultModel: DEFAULT_MODEL,
-        message: "Paste a gw-… key to load live models from Otari.",
+        message:
+          "Suggested models — paste a gw-… key to load whatever this Otari instance lists.",
       },
       error: null,
     });
@@ -79,15 +82,30 @@ app.post("/api/models", async (req, res) => {
   const client = new OtariClient(parsed.origin, config.requestTimeoutMs);
   const listed = await client.listModels(apiKey);
 
-  if (!listed.ok || listed.models.length === 0) {
+  if (!listed.ok) {
     res.json({
       data: {
-        source: "fallback",
+        source: "suggested",
+        models: fallbackModelGroups(),
+        defaultModel: DEFAULT_MODEL,
+        message: listed.error
+          ? `Could not load /v1/models (${listed.error}). Showing suggested models.`
+          : "Could not load /v1/models. Showing suggested models.",
+      },
+      error: null,
+    });
+    return;
+  }
+
+  if (listed.models.length === 0) {
+    res.json({
+      data: {
+        source: "suggested",
         models: fallbackModelGroups(),
         defaultModel: DEFAULT_MODEL,
         message:
-          listed.error ??
-          "Live /v1/models returned nothing; showing curated defaults.",
+          "Otari returned 0 models (common on env-only deploys with no pricing/discovery yet). Showing suggested models.",
+        ms: listed.ms,
       },
       error: null,
     });
@@ -105,6 +123,7 @@ app.post("/api/models", async (req, res) => {
       defaultModel,
       count: listed.models.length,
       ms: listed.ms,
+      message: `Live from Otari · ${listed.models.length} models`,
     },
     error: null,
   });
@@ -115,10 +134,7 @@ app.post("/api/chat", async (req, res) => {
     typeof req.body?.baseUrl === "string" && req.body.baseUrl.trim()
       ? req.body.baseUrl.trim()
       : config.otariBaseUrl;
-  const apiKey =
-    typeof req.body?.apiKey === "string" && req.body.apiKey.trim()
-      ? req.body.apiKey.trim()
-      : config.otariApiKey;
+  const apiKey = resolveApiKey(req.body?.apiKey);
   const model =
     typeof req.body?.model === "string" && req.body.model.trim()
       ? req.body.model.trim()

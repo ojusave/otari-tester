@@ -22,3 +22,5 @@ services:
         value: https://github.com/render-examples/otari-render-template
       - key: OTARI_API_KEY
         sync: false
+      - key: OTARI_MASTER_KEY
+        sync: false
