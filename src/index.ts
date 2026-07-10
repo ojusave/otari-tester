@@ -15,7 +15,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const publicDir = path.join(__dirname, "..", "public");
 
 const app = express();
-app.use(express.json({ limit: "32kb" }));
+app.use(express.json({ limit: "256kb" }));
 app.use(express.static(publicDir));
 
 app.get("/api/config", (_req, res) => {
@@ -139,10 +139,8 @@ app.post("/api/chat", async (req, res) => {
     typeof req.body?.model === "string" && req.body.model.trim()
       ? req.body.model.trim()
       : DEFAULT_MODEL;
-  const prompt =
-    typeof req.body?.prompt === "string" && req.body.prompt.trim()
-      ? req.body.prompt.trim()
-      : "Say hello in one short sentence.";
+
+  const messages = normalizeMessages(req.body?.messages, req.body?.prompt);
 
   if (!apiKey) {
     res.status(400).json({
@@ -151,6 +149,14 @@ app.post("/api/chat", async (req, res) => {
         code: "missing_api_key",
         message: "Paste a gw-… key (or set OTARI_API_KEY on the service).",
       },
+    });
+    return;
+  }
+
+  if (messages.length === 0) {
+    res.status(400).json({
+      data: null,
+      error: { code: "empty_messages", message: "Send at least one message." },
     });
     return;
   }
@@ -177,7 +183,7 @@ app.post("/api/chat", async (req, res) => {
   const [health, readiness, chat] = await Promise.all([
     client.health(),
     client.readiness(),
-    client.chat({ apiKey, model, prompt }),
+    client.chat({ apiKey, model, messages }),
   ]);
 
   res.json({
@@ -192,6 +198,29 @@ app.post("/api/chat", async (req, res) => {
     error: null,
   });
 });
+
+function normalizeMessages(
+  raw: unknown,
+  prompt: unknown
+): { role: string; content: string }[] {
+  if (Array.isArray(raw)) {
+    const out: { role: string; content: string }[] = [];
+    for (const item of raw) {
+      if (!item || typeof item !== "object") continue;
+      const role = (item as { role?: unknown }).role;
+      const content = (item as { content?: unknown }).content;
+      if (typeof role !== "string" || typeof content !== "string") continue;
+      if (!content.trim()) continue;
+      if (role !== "user" && role !== "assistant" && role !== "system") continue;
+      out.push({ role, content: content.trim() });
+    }
+    if (out.length > 0) return out;
+  }
+  if (typeof prompt === "string" && prompt.trim()) {
+    return [{ role: "user", content: prompt.trim() }];
+  }
+  return [];
+}
 
 app.listen(config.port, "0.0.0.0", () => {
   console.log(`otari-tester listening on 0.0.0.0:${config.port}`);

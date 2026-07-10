@@ -23,9 +23,12 @@ let refreshTimer = null;
 let pollTimer = null;
 let lastFetchKey = "";
 let hasEnvApiKey = false;
+/** Full turn history sent to Otari on each request. */
+let history = [];
 
 function fillModels(groups, preferredId) {
-  const previous = modelSelect.value === CUSTOM_VALUE ? CUSTOM_VALUE : selectedModelId();
+  const previous =
+    modelSelect.value === CUSTOM_VALUE ? CUSTOM_VALUE : selectedModelId();
   modelSelect.innerHTML = "";
   for (const group of groups) {
     const optgroup = document.createElement("optgroup");
@@ -99,17 +102,15 @@ function clearEmpty() {
   if (emptyState) emptyState.remove();
 }
 
-function appendBubble({ role, text, meta, error, raw }) {
+function appendBubble({ role, text, latencyMs, error }) {
   clearEmpty();
   const el = document.createElement("article");
   el.className = `bubble ${role}${error ? " error" : ""}`;
-  const metaHtml = meta
-    ? `<div class="bubble-meta"><span>${escapeHtml(meta.left)}</span><span>${escapeHtml(meta.right)}</span></div>`
-    : "";
-  const rawHtml = raw
-    ? `<details><summary>Raw JSON</summary><pre>${escapeHtml(JSON.stringify(raw, null, 2))}</pre></details>`
-    : "";
-  el.innerHTML = `${metaHtml}<div>${escapeHtml(text)}</div>${rawHtml}`;
+  const latency =
+    role === "assistant" && latencyMs != null
+      ? `<span class="bubble-latency">${escapeHtml(String(latencyMs))}ms</span>`
+      : "";
+  el.innerHTML = `${latency}<div class="bubble-body">${escapeHtml(text)}</div>`;
   thread.appendChild(el);
   thread.scrollTop = thread.scrollHeight;
 }
@@ -160,9 +161,7 @@ async function refreshModels({ force = false } = {}) {
     }
     fillModels(json.data.models, json.data.defaultModel);
     if (json.data.source === "live") {
-      setModelStatus(
-        `Live · ${json.data.count} models · ${new Date().toLocaleTimeString()}`
-      );
+      setModelStatus(`Live · ${json.data.count} models`);
     } else {
       setModelStatus(json.data.message ?? "Suggested models");
     }
@@ -231,17 +230,13 @@ form.addEventListener("submit", async (event) => {
   const prompt = promptInput.value.trim();
   if (!model || !prompt) return;
 
-  appendBubble({
-    role: "user",
-    text: prompt,
-    meta: { left: "you", right: model },
-  });
+  history.push({ role: "user", content: prompt });
+  appendBubble({ role: "user", text: prompt });
   promptInput.value = "";
   sendBtn.disabled = true;
   sendBtn.textContent = "Sending…";
 
   try {
-    await refreshModels({ force: true });
     const res = await fetch("/api/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -249,11 +244,12 @@ form.addEventListener("submit", async (event) => {
         baseUrl: baseUrlInput.value.trim(),
         apiKey: apiKeyInput.value.trim(),
         model,
-        prompt,
+        messages: history,
       }),
     });
     const json = await res.json();
     if (!res.ok || !json.data) {
+      history.pop();
       appendBubble({
         role: "assistant",
         text: json.error?.message ?? "Request failed",
@@ -264,32 +260,30 @@ form.addEventListener("submit", async (event) => {
       return;
     }
 
-    const { health, readiness, chat, model: usedModel } = json.data;
+    const { health, readiness, chat } = json.data;
     setPill(pillHealth, healthValue, health);
     setPill(pillReadiness, readinessValue, readiness);
 
     if (!chat.ok) {
+      history.pop();
       appendBubble({
         role: "assistant",
         text: chat.error || `Chat failed (HTTP ${chat.status ?? "?"})`,
         error: true,
-        meta: { left: "otari", right: `${chat.ms}ms` },
-        raw: chat.body,
+        latencyMs: chat.ms,
       });
       return;
     }
 
     const text = extractReply(chat.body) ?? "(no message content)";
+    history.push({ role: "assistant", content: text });
     appendBubble({
       role: "assistant",
       text,
-      meta: {
-        left: usedModel,
-        right: `HTTP ${chat.status} · ${chat.ms}ms`,
-      },
-      raw: chat.body,
+      latencyMs: chat.ms,
     });
   } catch (err) {
+    history.pop();
     appendBubble({
       role: "assistant",
       text: err instanceof Error ? err.message : String(err),

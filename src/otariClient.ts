@@ -102,7 +102,7 @@ export class OtariClient {
   async chat(opts: {
     apiKey: string;
     model: string;
-    prompt: string;
+    messages: { role: string; content: string }[];
   }): Promise<CheckResult> {
     const name = "chat";
     try {
@@ -116,7 +116,7 @@ export class OtariClient {
           },
           body: JSON.stringify({
             model: opts.model,
-            messages: [{ role: "user", content: opts.prompt }],
+            messages: opts.messages,
           }),
         },
         this.timeoutMs
