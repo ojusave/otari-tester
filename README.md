@@ -1,6 +1,6 @@
 # Otari Tester
 
-Small Render web app for chatting with a live [Otari](https://github.com/mozilla-ai/otari) gateway. Prompt in, reply out; health and readiness show as status pills.
+Small Render web app for chatting with a live [Otari](https://github.com/mozilla-ai/otari) gateway. Playground layout: connection rail + chat thread. Models prefer live `GET /v1/models`; suggested July 2026 IDs fill in when the gateway catalog is empty.
 
 Default target: `https://otari-ngc0.onrender.com`.
 

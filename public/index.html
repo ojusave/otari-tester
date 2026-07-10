@@ -14,13 +14,13 @@
     <link rel="stylesheet" href="/styles.css" />
   </head>
   <body>
-    <div class="page">
-      <header class="top">
+    <div class="shell">
+      <header class="topbar">
         <a class="brand" href="/">Otari Tester</a>
         <nav class="top-actions">
           <a
             id="otari-template-btn"
-            class="btn btn-signup"
+            class="btn btn-ghost"
             href="https://render.com/deploy-template/api/github/start?template_repo=otari-render-template"
             target="_blank"
             rel="noopener"
@@ -37,12 +37,12 @@
             <img
               src="https://render.com/images/deploy-to-render-button.svg"
               alt="Deploy to Render"
-              height="32"
+              height="28"
             />
           </a>
           <a
             id="signup-btn"
-            class="btn btn-signup"
+            class="btn btn-ghost"
             href="#"
             target="_blank"
             rel="noopener"
@@ -51,116 +51,97 @@
         </nav>
       </header>
 
-      <main class="stack">
-        <section class="hero">
-          <h1>Talk to your Otari gateway</h1>
-          <p>
-            Paste a gateway URL and a <code>gw-…</code> key from Otari’s logs,
-            pick a model, and send a prompt.
-          </p>
-        </section>
-
-        <form id="chat-form" class="panel">
-          <div class="row">
-            <label>
-              Otari URL
-              <input
-                id="base-url"
-                name="baseUrl"
-                type="url"
-                required
-                autocomplete="off"
-                spellcheck="false"
-              />
-            </label>
-            <label>
-              API key <span class="hint">gw-… from Otari logs</span>
-              <input
-                id="api-key"
-                name="apiKey"
-                type="password"
-                autocomplete="off"
-                placeholder="gw-…"
-                required
-              />
-            </label>
-          </div>
-
+      <div class="workspace">
+        <aside class="rail">
+          <p class="rail-title">Connection</p>
           <label>
-            Model
-            <span class="hint" id="model-status">loading…</span>
-            <select id="model" name="model" required></select>
-          </label>
-
-          <label class="custom-model" id="custom-model-wrap" hidden>
-            Custom model id
+            Otari URL
             <input
-              id="custom-model"
-              name="customModel"
-              type="text"
-              placeholder="provider:model-name"
+              id="base-url"
+              type="url"
+              required
+              autocomplete="off"
               spellcheck="false"
             />
           </label>
-
           <label>
-            Prompt
+            API key
+            <input
+              id="api-key"
+              type="password"
+              autocomplete="off"
+              placeholder="gw-…"
+              required
+            />
+          </label>
+          <label>
+            Model
+            <select id="model" required></select>
+          </label>
+          <label class="custom-model" id="custom-model-wrap" hidden>
+            Custom id
+            <input
+              id="custom-model"
+              type="text"
+              placeholder="provider:model"
+              spellcheck="false"
+            />
+          </label>
+          <p id="model-status" class="model-status">loading…</p>
+
+          <div class="rail-status">
+            <div class="status-pill" id="pill-health">
+              <span class="dot"></span>
+              <span class="pill-label">health</span>
+              <span class="pill-value" id="health-value">—</span>
+            </div>
+            <div class="status-pill" id="pill-readiness">
+              <span class="dot"></span>
+              <span class="pill-label">ready</span>
+              <span class="pill-value" id="readiness-value">—</span>
+            </div>
+          </div>
+
+          <div class="rail-footer">
+            <a id="github-link" href="https://github.com/ojusave/otari-tester"
+              >GitHub</a
+            >
+            <span class="sep">·</span>
+            <a
+              id="otari-template-repo"
+              href="https://github.com/render-examples/otari-render-template"
+              target="_blank"
+              rel="noopener"
+              >Template</a
+            >
+          </div>
+        </aside>
+
+        <section class="chat">
+          <div id="thread" class="thread">
+            <div class="empty" id="empty-state">
+              <h1>Talk to your Otari gateway</h1>
+              <p>
+                Set URL and a <code>gw-…</code> key in the rail, pick a model,
+                then send a prompt. Replies show here.
+              </p>
+            </div>
+          </div>
+
+          <form id="chat-form" class="composer">
             <textarea
               id="prompt"
-              name="prompt"
-              rows="4"
+              rows="3"
               required
-              placeholder="Ask the gateway something…"
-            >Say hello in one short sentence.</textarea>
-          </label>
-
-          <button type="submit" id="send-btn">Send</button>
-        </form>
-
-        <section id="reply-panel" class="reply-panel" hidden>
-          <div class="reply-head">
-            <h2>Reply</h2>
-            <p id="reply-meta" class="reply-meta"></p>
-          </div>
-          <div id="reply-text" class="reply-text"></div>
-          <p id="reply-error" class="reply-error" hidden></p>
-          <details id="reply-raw" class="reply-raw" hidden>
-            <summary>Raw JSON</summary>
-            <pre id="reply-raw-body"></pre>
-          </details>
+              placeholder="Message Otari…"
+            ></textarea>
+            <div class="composer-bar">
+              <span class="composer-hint">Enter to send · Shift+Enter for newline</span>
+              <button type="submit" id="send-btn">Send</button>
+            </div>
+          </form>
         </section>
-
-        <section class="status-strip" aria-label="Gateway status">
-          <div class="status-pill" id="pill-health">
-            <span class="dot"></span>
-            <span class="pill-label">health</span>
-            <span class="pill-value" id="health-value">—</span>
-          </div>
-          <div class="status-pill" id="pill-readiness">
-            <span class="dot"></span>
-            <span class="pill-label">readiness</span>
-            <span class="pill-value" id="readiness-value">—</span>
-          </div>
-        </section>
-      </main>
-
-      <footer>
-        <a id="github-link" href="https://github.com/ojusave/otari-tester"
-          >GitHub</a
-        >
-        <span class="sep">·</span>
-        <a
-          id="otari-template-repo"
-          href="https://github.com/render-examples/otari-render-template"
-          target="_blank"
-          rel="noopener"
-          >Otari template</a
-        >
-        <span class="sep">·</span>
-        <a href="https://render.com/docs" target="_blank" rel="noopener"
-          >Render docs</a
-        >
-      </footer>
+      </div>
     </div>
     <script type="module" src="/app.js"></script>
   </body>

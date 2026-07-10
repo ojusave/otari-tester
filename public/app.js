@@ -7,13 +7,8 @@ const customModel = document.getElementById("custom-model");
 const baseUrlInput = document.getElementById("base-url");
 const apiKeyInput = document.getElementById("api-key");
 const promptInput = document.getElementById("prompt");
-
-const replyPanel = document.getElementById("reply-panel");
-const replyText = document.getElementById("reply-text");
-const replyMeta = document.getElementById("reply-meta");
-const replyError = document.getElementById("reply-error");
-const replyRaw = document.getElementById("reply-raw");
-const replyRawBody = document.getElementById("reply-raw-body");
+const thread = document.getElementById("thread");
+const emptyState = document.getElementById("empty-state");
 
 const pillHealth = document.getElementById("pill-health");
 const pillReadiness = document.getElementById("pill-readiness");
@@ -23,15 +18,14 @@ const readinessValue = document.getElementById("readiness-value");
 const CUSTOM_VALUE = "__custom__";
 
 let fallbackModels = [];
-let fallbackDefault = "openai:gpt-4.1-mini";
+let fallbackDefault = "openai:gpt-5.5";
 let refreshTimer = null;
 let pollTimer = null;
 let lastFetchKey = "";
 let hasEnvApiKey = false;
-let modelSource = "suggested";
 
 function fillModels(groups, preferredId) {
-  const previous = selectedModelId();
+  const previous = modelSelect.value === CUSTOM_VALUE ? CUSTOM_VALUE : selectedModelId();
   modelSelect.innerHTML = "";
   for (const group of groups) {
     const optgroup = document.createElement("optgroup");
@@ -39,7 +33,7 @@ function fillModels(groups, preferredId) {
     for (const m of group.models) {
       const opt = document.createElement("option");
       opt.value = m.id;
-      opt.textContent = m.label.includes(":") ? m.label : `${group.group}: ${m.label}`;
+      opt.textContent = m.label;
       optgroup.appendChild(opt);
     }
     modelSelect.appendChild(optgroup);
@@ -50,10 +44,10 @@ function fillModels(groups, preferredId) {
   modelSelect.appendChild(custom);
 
   const ids = [...modelSelect.options].map((o) => o.value);
-  if (previous && previous !== CUSTOM_VALUE && ids.includes(previous)) {
-    modelSelect.value = previous;
-  } else if (previous === CUSTOM_VALUE) {
+  if (previous === CUSTOM_VALUE) {
     modelSelect.value = CUSTOM_VALUE;
+  } else if (previous && ids.includes(previous)) {
+    modelSelect.value = previous;
   } else if (preferredId && ids.includes(preferredId)) {
     modelSelect.value = preferredId;
   } else if (ids[0]) {
@@ -63,9 +57,7 @@ function fillModels(groups, preferredId) {
 }
 
 function selectedModelId() {
-  if (modelSelect.value === CUSTOM_VALUE) {
-    return customModel.value.trim();
-  }
+  if (modelSelect.value === CUSTOM_VALUE) return customModel.value.trim();
   return modelSelect.value;
 }
 
@@ -98,9 +90,28 @@ function setPill(pill, valueEl, check) {
   } else {
     pill.classList.add("bad");
     valueEl.textContent = check.error
-      ? String(check.error).slice(0, 48)
-      : `HTTP ${check.status ?? "?"} · ${check.ms}ms`;
+      ? String(check.error).slice(0, 40)
+      : `HTTP ${check.status ?? "?"}`;
   }
+}
+
+function clearEmpty() {
+  if (emptyState) emptyState.remove();
+}
+
+function appendBubble({ role, text, meta, error, raw }) {
+  clearEmpty();
+  const el = document.createElement("article");
+  el.className = `bubble ${role}${error ? " error" : ""}`;
+  const metaHtml = meta
+    ? `<div class="bubble-meta"><span>${escapeHtml(meta.left)}</span><span>${escapeHtml(meta.right)}</span></div>`
+    : "";
+  const rawHtml = raw
+    ? `<details><summary>Raw JSON</summary><pre>${escapeHtml(JSON.stringify(raw, null, 2))}</pre></details>`
+    : "";
+  el.innerHTML = `${metaHtml}<div>${escapeHtml(text)}</div>${rawHtml}`;
+  thread.appendChild(el);
+  thread.scrollTop = thread.scrollHeight;
 }
 
 function extractReply(body) {
@@ -113,51 +124,28 @@ function extractReply(body) {
   return null;
 }
 
-function showReply({ chat, model }) {
-  replyPanel.hidden = false;
-  replyError.hidden = true;
-  replyText.hidden = false;
-  replyRaw.hidden = true;
-
-  if (!chat?.ok) {
-    replyText.textContent = "";
-    replyText.hidden = true;
-    replyError.hidden = false;
-    replyError.textContent =
-      chat?.error || `Chat failed${chat?.status ? ` (HTTP ${chat.status})` : ""}`;
-    replyMeta.textContent = chat ? `${chat.ms}ms` : "";
-    if (chat?.body) {
-      replyRaw.hidden = false;
-      replyRawBody.textContent = JSON.stringify(chat.body, null, 2);
-    }
-    return;
-  }
-
-  const text = extractReply(chat.body);
-  replyText.textContent = text ?? "(no message content in response)";
-  replyMeta.textContent = `${model} · HTTP ${chat.status} · ${chat.ms}ms`;
-  replyRaw.hidden = false;
-  replyRawBody.textContent = JSON.stringify(chat.body, null, 2);
+function escapeHtml(s) {
+  return String(s)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;");
 }
 
 async function refreshModels({ force = false } = {}) {
   const baseUrl = baseUrlInput.value.trim();
   const apiKey = apiKeyInput.value.trim();
   const fetchKey = `${baseUrl}::${apiKey || (hasEnvApiKey ? "env" : "")}`;
-
   if (!force && fetchKey === lastFetchKey) return;
   lastFetchKey = fetchKey;
 
   if (!apiKey && !hasEnvApiKey) {
-    modelSource = "suggested";
     fillModels(fallbackModels, fallbackDefault);
-    setModelStatus(
-      "Suggested models — paste a gw-… key to load this Otari’s live catalog"
-    );
+    setModelStatus("Suggested · paste gw-… for live /v1/models");
     return;
   }
 
-  setModelStatus("Refreshing models from Otari…");
+  setModelStatus("Refreshing from Otari…");
   try {
     const res = await fetch("/api/models", {
       method: "POST",
@@ -166,23 +154,19 @@ async function refreshModels({ force = false } = {}) {
     });
     const json = await res.json();
     if (!res.ok || !json.data) {
-      modelSource = "suggested";
       fillModels(fallbackModels, fallbackDefault);
       setModelStatus(json.error?.message ?? "could not load models");
       return;
     }
-
-    modelSource = json.data.source;
     fillModels(json.data.models, json.data.defaultModel);
     if (json.data.source === "live") {
       setModelStatus(
-        `${json.data.message} · updated ${new Date().toLocaleTimeString()}`
+        `Live · ${json.data.count} models · ${new Date().toLocaleTimeString()}`
       );
     } else {
       setModelStatus(json.data.message ?? "Suggested models");
     }
   } catch (err) {
-    modelSource = "suggested";
     fillModels(fallbackModels, fallbackDefault);
     setModelStatus(err instanceof Error ? err.message : "models request failed");
   }
@@ -221,7 +205,7 @@ async function loadConfig() {
 
   if (hasEnvApiKey) {
     apiKeyInput.required = false;
-    apiKeyInput.placeholder = "using env key — or paste to override";
+    apiKeyInput.placeholder = "env key set — or paste override";
   }
 
   await refreshModels({ force: true });
@@ -234,17 +218,25 @@ apiKeyInput.addEventListener("input", scheduleRefresh);
 apiKeyInput.addEventListener("change", scheduleRefresh);
 modelSelect.addEventListener("change", syncCustomVisibility);
 
+promptInput.addEventListener("keydown", (event) => {
+  if (event.key === "Enter" && !event.shiftKey) {
+    event.preventDefault();
+    form.requestSubmit();
+  }
+});
+
 form.addEventListener("submit", async (event) => {
   event.preventDefault();
   const model = selectedModelId();
-  if (!model) {
-    showReply({
-      chat: { ok: false, error: "Pick or enter a model id.", ms: 0 },
-      model: "",
-    });
-    return;
-  }
+  const prompt = promptInput.value.trim();
+  if (!model || !prompt) return;
 
+  appendBubble({
+    role: "user",
+    text: prompt,
+    meta: { left: "you", right: model },
+  });
+  promptInput.value = "";
   sendBtn.disabled = true;
   sendBtn.textContent = "Sending…";
 
@@ -256,19 +248,16 @@ form.addEventListener("submit", async (event) => {
       body: JSON.stringify({
         baseUrl: baseUrlInput.value.trim(),
         apiKey: apiKeyInput.value.trim(),
-        model: selectedModelId(),
-        prompt: promptInput.value.trim(),
+        model,
+        prompt,
       }),
     });
     const json = await res.json();
     if (!res.ok || !json.data) {
-      showReply({
-        chat: {
-          ok: false,
-          error: json.error?.message ?? "Request failed",
-          ms: 0,
-        },
-        model: selectedModelId(),
+      appendBubble({
+        role: "assistant",
+        text: json.error?.message ?? "Request failed",
+        error: true,
       });
       setPill(pillHealth, healthValue, null);
       setPill(pillReadiness, readinessValue, null);
@@ -276,24 +265,41 @@ form.addEventListener("submit", async (event) => {
     }
 
     const { health, readiness, chat, model: usedModel } = json.data;
-    showReply({ chat, model: usedModel });
     setPill(pillHealth, healthValue, health);
     setPill(pillReadiness, readinessValue, readiness);
-  } catch (err) {
-    showReply({
-      chat: {
-        ok: false,
-        error: err instanceof Error ? err.message : String(err),
-        ms: 0,
+
+    if (!chat.ok) {
+      appendBubble({
+        role: "assistant",
+        text: chat.error || `Chat failed (HTTP ${chat.status ?? "?"})`,
+        error: true,
+        meta: { left: "otari", right: `${chat.ms}ms` },
+        raw: chat.body,
+      });
+      return;
+    }
+
+    const text = extractReply(chat.body) ?? "(no message content)";
+    appendBubble({
+      role: "assistant",
+      text,
+      meta: {
+        left: usedModel,
+        right: `HTTP ${chat.status} · ${chat.ms}ms`,
       },
-      model: selectedModelId(),
+      raw: chat.body,
+    });
+  } catch (err) {
+    appendBubble({
+      role: "assistant",
+      text: err instanceof Error ? err.message : String(err),
+      error: true,
     });
   } finally {
     sendBtn.disabled = false;
     sendBtn.textContent = "Send";
+    promptInput.focus();
   }
 });
 
-loadConfig().catch((err) => {
-  console.error(err);
-});
+loadConfig().catch(console.error);
