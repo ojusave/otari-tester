@@ -1,12 +1,22 @@
-const form = document.getElementById("smoke-form");
-const runBtn = document.getElementById("run-btn");
-const results = document.getElementById("results");
-const checksEl = document.getElementById("checks");
-const summary = document.getElementById("summary");
+const form = document.getElementById("chat-form");
+const sendBtn = document.getElementById("send-btn");
 const modelSelect = document.getElementById("model");
 const modelStatus = document.getElementById("model-status");
 const baseUrlInput = document.getElementById("base-url");
 const apiKeyInput = document.getElementById("api-key");
+const promptInput = document.getElementById("prompt");
+
+const replyPanel = document.getElementById("reply-panel");
+const replyText = document.getElementById("reply-text");
+const replyMeta = document.getElementById("reply-meta");
+const replyError = document.getElementById("reply-error");
+const replyRaw = document.getElementById("reply-raw");
+const replyRawBody = document.getElementById("reply-raw-body");
+
+const pillHealth = document.getElementById("pill-health");
+const pillReadiness = document.getElementById("pill-readiness");
+const healthValue = document.getElementById("health-value");
+const readinessValue = document.getElementById("readiness-value");
 
 let fallbackModels = [];
 let fallbackDefault = "openai:gpt-4o-mini";
@@ -41,6 +51,67 @@ function fillModels(groups, preferredId) {
 
 function setModelStatus(text) {
   modelStatus.textContent = text;
+}
+
+function setPill(pill, valueEl, check) {
+  pill.classList.remove("ok", "bad");
+  if (!check) {
+    valueEl.textContent = "—";
+    return;
+  }
+  if (check.ok) {
+    pill.classList.add("ok");
+    const detail =
+      check.name === "readiness" &&
+      check.body &&
+      typeof check.body === "object" &&
+      "database" in check.body
+        ? String(check.body.database)
+        : "ok";
+    valueEl.textContent = `${detail} · ${check.ms}ms`;
+  } else {
+    pill.classList.add("bad");
+    valueEl.textContent = check.error
+      ? String(check.error).slice(0, 48)
+      : `HTTP ${check.status ?? "?"} · ${check.ms}ms`;
+  }
+}
+
+function extractReply(body) {
+  if (!body || typeof body !== "object") return null;
+  const choices = body.choices;
+  if (!Array.isArray(choices) || !choices[0]) return null;
+  const message = choices[0].message;
+  if (message && typeof message.content === "string") return message.content;
+  if (typeof choices[0].text === "string") return choices[0].text;
+  return null;
+}
+
+function showReply({ chat, model }) {
+  replyPanel.hidden = false;
+  replyError.hidden = true;
+  replyText.hidden = false;
+  replyRaw.hidden = true;
+
+  if (!chat?.ok) {
+    replyText.textContent = "";
+    replyText.hidden = true;
+    replyError.hidden = false;
+    replyError.textContent =
+      chat?.error || `Chat failed${chat?.status ? ` (HTTP ${chat.status})` : ""}`;
+    replyMeta.textContent = chat ? `${chat.ms}ms` : "";
+    if (chat?.body) {
+      replyRaw.hidden = false;
+      replyRawBody.textContent = JSON.stringify(chat.body, null, 2);
+    }
+    return;
+  }
+
+  const text = extractReply(chat.body);
+  replyText.textContent = text ?? "(no message content in response)";
+  replyMeta.textContent = `${model} · HTTP ${chat.status} · ${chat.ms}ms`;
+  replyRaw.hidden = false;
+  replyRawBody.textContent = JSON.stringify(chat.body, null, 2);
 }
 
 async function refreshModels({ force = false } = {}) {
@@ -126,36 +197,6 @@ async function loadConfig() {
   startPolling();
 }
 
-function renderChecks(checks) {
-  checksEl.innerHTML = "";
-  for (const c of checks) {
-    const li = document.createElement("li");
-    li.className = "check";
-    const status = c.status != null ? `HTTP ${c.status}` : "—";
-    const detail = c.error ? { error: c.error, body: c.body } : c.body;
-    li.innerHTML = `
-      <div class="check-bar">
-        <span class="badge ${c.ok ? "ok" : "bad"}">${c.ok ? "pass" : "fail"}</span>
-        <span class="check-name">${escapeHtml(c.name)}</span>
-        <span class="meta">${status} · ${c.ms}ms</span>
-      </div>
-      <details>
-        <summary>Response</summary>
-        <pre>${escapeHtml(JSON.stringify(detail, null, 2))}</pre>
-      </details>
-    `;
-    checksEl.appendChild(li);
-  }
-}
-
-function escapeHtml(s) {
-  return String(s)
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;");
-}
-
 baseUrlInput.addEventListener("change", scheduleRefresh);
 baseUrlInput.addEventListener("blur", scheduleRefresh);
 apiKeyInput.addEventListener("input", scheduleRefresh);
@@ -163,42 +204,52 @@ apiKeyInput.addEventListener("change", scheduleRefresh);
 
 form.addEventListener("submit", async (event) => {
   event.preventDefault();
-  runBtn.disabled = true;
-  runBtn.textContent = "Running…";
-  results.hidden = true;
+  sendBtn.disabled = true;
+  sendBtn.textContent = "Sending…";
 
   try {
     await refreshModels({ force: true });
-    const res = await fetch("/api/smoke", {
+    const res = await fetch("/api/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         baseUrl: baseUrlInput.value.trim(),
         apiKey: apiKeyInput.value.trim(),
         model: modelSelect.value,
-        prompt: document.getElementById("prompt").value.trim(),
+        prompt: promptInput.value.trim(),
       }),
     });
     const json = await res.json();
     if (!res.ok || !json.data) {
-      summary.textContent = json.error?.message ?? "Request failed";
-      summary.className = "summary bad";
-      checksEl.innerHTML = "";
-      results.hidden = false;
+      showReply({
+        chat: {
+          ok: false,
+          error: json.error?.message ?? "Request failed",
+          ms: 0,
+        },
+        model: modelSelect.value,
+      });
+      setPill(pillHealth, healthValue, null);
+      setPill(pillReadiness, readinessValue, null);
       return;
     }
-    summary.textContent = json.data.ok ? "All checks passed" : "Something failed";
-    summary.className = `summary ${json.data.ok ? "ok" : "bad"}`;
-    renderChecks(json.data.checks);
-    results.hidden = false;
+
+    const { health, readiness, chat, model } = json.data;
+    showReply({ chat, model });
+    setPill(pillHealth, healthValue, health);
+    setPill(pillReadiness, readinessValue, readiness);
   } catch (err) {
-    summary.textContent = err instanceof Error ? err.message : String(err);
-    summary.className = "summary bad";
-    checksEl.innerHTML = "";
-    results.hidden = false;
+    showReply({
+      chat: {
+        ok: false,
+        error: err instanceof Error ? err.message : String(err),
+        ms: 0,
+      },
+      model: modelSelect.value,
+    });
   } finally {
-    runBtn.disabled = false;
-    runBtn.textContent = "Run smoke tests";
+    sendBtn.disabled = false;
+    sendBtn.textContent = "Send";
   }
 });
 

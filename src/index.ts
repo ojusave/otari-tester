@@ -110,7 +110,7 @@ app.post("/api/models", async (req, res) => {
   });
 });
 
-app.post("/api/smoke", async (req, res) => {
+app.post("/api/chat", async (req, res) => {
   const baseUrl =
     typeof req.body?.baseUrl === "string" && req.body.baseUrl.trim()
       ? req.body.baseUrl.trim()
@@ -126,7 +126,7 @@ app.post("/api/smoke", async (req, res) => {
   const prompt =
     typeof req.body?.prompt === "string" && req.body.prompt.trim()
       ? req.body.prompt.trim()
-      : "ping";
+      : "Say hello in one short sentence.";
 
   if (!apiKey) {
     res.status(400).json({
@@ -157,18 +157,21 @@ app.post("/api/smoke", async (req, res) => {
     return;
   }
 
-  const client = new OtariClient(baseUrl, config.requestTimeoutMs);
-  const health = await client.health();
-  const readiness = await client.readiness();
-  const chat = await client.chat({ apiKey, model, prompt });
+  const client = new OtariClient(parsed.origin, config.requestTimeoutMs);
+  const [health, readiness, chat] = await Promise.all([
+    client.health(),
+    client.readiness(),
+    client.chat({ apiKey, model, prompt }),
+  ]);
 
-  const checks = [health, readiness, chat];
   res.json({
     data: {
       baseUrl: parsed.origin,
       model,
-      checks,
-      ok: checks.every((c) => c.ok),
+      health,
+      readiness,
+      chat,
+      ok: chat.ok,
     },
     error: null,
   });

@@ -53,12 +53,10 @@
 
       <main class="stack">
         <section class="hero">
-          <h1>Check that your Otari gateway works</h1>
+          <h1>Talk to your Otari gateway</h1>
           <p>
-            Otari is an OpenAI-compatible LLM gateway. This page calls a live
-            instance: health, readiness, then one chat completion. Paste the
-            gateway URL and a <code>gw-…</code> API key from that service’s logs.
-            Need a gateway first?
+            Paste a gateway URL and a <code>gw-…</code> key from Otari’s logs,
+            write a prompt, and read the reply. Need a gateway?
             <a
               id="otari-template-link"
               href="https://render.com/deploy-template/api/github/start?template_repo=otari-render-template"
@@ -69,49 +67,76 @@
           </p>
         </section>
 
-        <form id="smoke-form" class="panel">
-          <label>
-            Otari URL
-            <input
-              id="base-url"
-              name="baseUrl"
-              type="url"
-              required
-              autocomplete="off"
-              spellcheck="false"
-            />
-          </label>
-          <label>
-            API key <span class="hint">gw-… from Otari logs</span>
-            <input
-              id="api-key"
-              name="apiKey"
-              type="password"
-              autocomplete="off"
-              placeholder="gw-…"
-              required
-            />
-          </label>
+        <form id="chat-form" class="panel">
           <div class="row">
             <label>
-              Model
-              <span class="hint" id="model-status">curated defaults</span>
-              <select id="model" name="model" required></select>
+              Otari URL
+              <input
+                id="base-url"
+                name="baseUrl"
+                type="url"
+                required
+                autocomplete="off"
+                spellcheck="false"
+              />
             </label>
             <label>
-              Prompt
-              <input id="prompt" name="prompt" type="text" value="ping" />
+              API key <span class="hint">gw-…</span>
+              <input
+                id="api-key"
+                name="apiKey"
+                type="password"
+                autocomplete="off"
+                placeholder="gw-…"
+                required
+              />
             </label>
           </div>
-          <button type="submit" id="run-btn">Run smoke tests</button>
+
+          <label>
+            Model
+            <span class="hint" id="model-status">curated defaults</span>
+            <select id="model" name="model" required></select>
+          </label>
+
+          <label>
+            Prompt
+            <textarea
+              id="prompt"
+              name="prompt"
+              rows="4"
+              required
+              placeholder="Ask the gateway something…"
+            >Say hello in one short sentence.</textarea>
+          </label>
+
+          <button type="submit" id="send-btn">Send</button>
         </form>
 
-        <section id="results" class="results" hidden>
-          <div class="results-head">
-            <h2>Results</h2>
-            <p id="summary" class="summary"></p>
+        <section id="reply-panel" class="reply-panel" hidden>
+          <div class="reply-head">
+            <h2>Reply</h2>
+            <p id="reply-meta" class="reply-meta"></p>
           </div>
-          <ol id="checks" class="checks"></ol>
+          <div id="reply-text" class="reply-text"></div>
+          <p id="reply-error" class="reply-error" hidden></p>
+          <details id="reply-raw" class="reply-raw" hidden>
+            <summary>Raw JSON</summary>
+            <pre id="reply-raw-body"></pre>
+          </details>
+        </section>
+
+        <section class="status-strip" aria-label="Gateway status">
+          <div class="status-pill" id="pill-health">
+            <span class="dot"></span>
+            <span class="pill-label">health</span>
+            <span class="pill-value" id="health-value">—</span>
+          </div>
+          <div class="status-pill" id="pill-readiness">
+            <span class="dot"></span>
+            <span class="pill-label">readiness</span>
+            <span class="pill-value" id="readiness-value">—</span>
+          </div>
         </section>
       </main>
 

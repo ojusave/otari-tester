@@ -1,6 +1,6 @@
 # Otari Tester
 
-Small Render web app that smoke-tests a live [Otari](https://github.com/mozilla-ai/otari) gateway: health, readiness, then one chat completion.
+Small Render web app for chatting with a live [Otari](https://github.com/mozilla-ai/otari) gateway. Prompt in, reply out; health and readiness show as status pills.
 
 Default target: `https://otari-ngc0.onrender.com`.
 
