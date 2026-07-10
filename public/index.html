@@ -19,11 +19,20 @@
         <a class="brand" href="/">Otari Tester</a>
         <nav class="top-actions">
           <a
-            id="deploy-btn"
-            class="btn btn-deploy"
-            href="https://render.com/deploy"
+            id="otari-template-btn"
+            class="btn btn-signup"
+            href="https://render.com/deploy-template/api/github/start?template_repo=otari-render-template"
             target="_blank"
             rel="noopener"
+            >Deploy Otari</a
+          >
+          <a
+            id="deploy-btn"
+            class="btn btn-deploy"
+            href="https://render.com/deploy?repo=https://github.com/ojusave/otari-tester"
+            target="_blank"
+            rel="noopener"
+            title="Deploy this tester"
           >
             <img
               src="https://render.com/images/deploy-to-render-button.svg"
@@ -42,13 +51,21 @@
         </nav>
       </header>
 
-      <main>
+      <main class="stack">
         <section class="hero">
           <h1>Check that your Otari gateway works</h1>
           <p>
             Otari is an OpenAI-compatible LLM gateway. This page calls a live
             instance: health, readiness, then one chat completion. Paste the
             gateway URL and a <code>gw-…</code> API key from that service’s logs.
+            Need a gateway first?
+            <a
+              id="otari-template-link"
+              href="https://render.com/deploy-template/api/github/start?template_repo=otari-render-template"
+              target="_blank"
+              rel="noopener"
+              >Deploy Otari on Render</a
+            >.
           </p>
         </section>
 
@@ -78,13 +95,7 @@
           <div class="row">
             <label>
               Model
-              <input
-                id="model"
-                name="model"
-                type="text"
-                value="openai:gpt-4o-mini"
-                spellcheck="false"
-              />
+              <select id="model" name="model" required></select>
             </label>
             <label>
               Prompt
@@ -109,9 +120,14 @@
         >
         <span class="sep">·</span>
         <a
-          href="https://render.com/docs"
+          id="otari-template-repo"
+          href="https://github.com/render-examples/otari-render-template"
           target="_blank"
           rel="noopener"
+          >Otari template</a
+        >
+        <span class="sep">·</span>
+        <a href="https://render.com/docs" target="_blank" rel="noopener"
           >Render docs</a
         >
       </footer>

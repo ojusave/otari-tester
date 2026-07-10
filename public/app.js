@@ -3,6 +3,23 @@ const runBtn = document.getElementById("run-btn");
 const results = document.getElementById("results");
 const checksEl = document.getElementById("checks");
 const summary = document.getElementById("summary");
+const modelSelect = document.getElementById("model");
+
+function fillModels(groups, defaultModel) {
+  modelSelect.innerHTML = "";
+  for (const group of groups) {
+    const optgroup = document.createElement("optgroup");
+    optgroup.label = group.group;
+    for (const m of group.models) {
+      const opt = document.createElement("option");
+      opt.value = m.id;
+      opt.textContent = `${group.group}: ${m.label}`;
+      if (m.id === defaultModel) opt.selected = true;
+      optgroup.appendChild(opt);
+    }
+    modelSelect.appendChild(optgroup);
+  }
+}
 
 async function loadConfig() {
   const res = await fetch("/api/config");
@@ -12,6 +29,10 @@ async function loadConfig() {
   document.getElementById("deploy-btn").href = cfg.deployUrl;
   document.getElementById("signup-btn").href = cfg.signupNavbar;
   document.getElementById("github-link").href = cfg.githubRepo;
+  document.getElementById("otari-template-btn").href = cfg.otariTemplateDeployUrl;
+  document.getElementById("otari-template-link").href = cfg.otariTemplateDeployUrl;
+  document.getElementById("otari-template-repo").href = cfg.otariTemplateRepo;
+  fillModels(cfg.models, cfg.defaultModel);
   if (cfg.hasEnvApiKey) {
     const key = document.getElementById("api-key");
     key.required = false;
@@ -25,9 +46,7 @@ function renderChecks(checks) {
     const li = document.createElement("li");
     li.className = "check";
     const status = c.status != null ? `HTTP ${c.status}` : "—";
-    const detail = c.error
-      ? { error: c.error, body: c.body }
-      : c.body;
+    const detail = c.error ? { error: c.error, body: c.body } : c.body;
     li.innerHTML = `
       <div class="check-bar">
         <span class="badge ${c.ok ? "ok" : "bad"}">${c.ok ? "pass" : "fail"}</span>
@@ -64,7 +83,7 @@ form.addEventListener("submit", async (event) => {
       body: JSON.stringify({
         baseUrl: document.getElementById("base-url").value.trim(),
         apiKey: document.getElementById("api-key").value.trim(),
-        model: document.getElementById("model").value.trim(),
+        model: modelSelect.value,
         prompt: document.getElementById("prompt").value.trim(),
       }),
     });

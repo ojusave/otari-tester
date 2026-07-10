@@ -16,5 +16,9 @@ services:
         value: https://otari-ngc0.onrender.com
       - key: GITHUB_REPO
         value: https://github.com/ojusave/otari-tester
+      - key: OTARI_TEMPLATE_DEPLOY_URL
+        value: https://render.com/deploy-template/api/github/start?template_repo=otari-render-template
+      - key: OTARI_TEMPLATE_REPO
+        value: https://github.com/render-examples/otari-render-template
       - key: OTARI_API_KEY
         sync: false

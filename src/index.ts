@@ -2,6 +2,7 @@ import express from "express";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { config } from "./config.js";
+import { DEFAULT_MODEL, MODEL_OPTIONS } from "./models.js";
 import { OtariClient } from "./otariClient.js";
 import { renderSignupUrlWithUtms } from "./renderSignup.js";
 
@@ -18,9 +19,15 @@ app.get("/api/config", (_req, res) => {
       otariBaseUrl: config.otariBaseUrl,
       hasEnvApiKey: Boolean(config.otariApiKey),
       githubRepo: config.githubRepo,
+      /** Deploy this tester app. */
       deployUrl: `https://render.com/deploy?repo=${encodeURIComponent(config.githubRepo)}`,
+      /** Deploy an Otari gateway from the Render gallery template. */
+      otariTemplateDeployUrl: config.otariTemplateDeployUrl,
+      otariTemplateRepo: config.otariTemplateRepo,
       signupNavbar: renderSignupUrlWithUtms("navbar_button"),
       signupHero: renderSignupUrlWithUtms("hero_cta"),
+      models: MODEL_OPTIONS,
+      defaultModel: DEFAULT_MODEL,
     },
   });
 });
@@ -41,7 +48,7 @@ app.post("/api/smoke", async (req, res) => {
   const model =
     typeof req.body?.model === "string" && req.body.model.trim()
       ? req.body.model.trim()
-      : "openai:gpt-4o-mini";
+      : DEFAULT_MODEL;
   const prompt =
     typeof req.body?.prompt === "string" && req.body.prompt.trim()
       ? req.body.prompt.trim()
